@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>正規表現構文4択クイズ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-4">
+<div class="max-w-xl mx-auto">
+  <h1 class="text-2xl font-bold text-center mb-1">正規表現構文4択クイズ</h1>
+  <p class="text-center text-gray-400 text-sm mb-4">パターン・マッチ・グループを学習</p>
+
+  <!-- Score -->
+  <div class="flex gap-3 mb-4 text-center text-sm">
+    <div class="flex-1 bg-gray-900 rounded-lg py-2">正解 <span id="correct" class="text-green-400 font-bold text-lg">0</span></div>
+    <div class="flex-1 bg-gray-900 rounded-lg py-2">問題 <span id="qcount" class="text-gray-300 font-bold text-lg">0</span>/25</div>
+    <div class="flex-1 bg-gray-900 rounded-lg py-2">ハイスコア <span id="hi" class="text-yellow-400 font-bold text-lg">0</span></div>
+  </div>
+
+  <!-- Quiz Card -->
+  <div id="quizCard" class="bg-gray-900 rounded-xl p-5 mb-4">
+    <div id="qNum" class="text-xs text-gray-500 mb-2">問題 1 / 25</div>
+    <div id="patternBox" class="bg-gray-800 rounded-lg px-4 py-2 mb-2 font-mono text-green-300 text-lg text-center hidden"></div>
+    <div id="testBox" class="bg-gray-800 rounded-lg px-4 py-2 mb-3 font-mono text-yellow-200 text-sm text-center hidden"></div>
+    <div id="question" class="text-base font-semibold mb-4 leading-snug"></div>
+    <div id="choices" class="space-y-2"></div>
+    <div id="feedback" class="mt-3 p-3 rounded-lg text-sm hidden"></div>
+    <button id="nextBtn" onclick="next()" class="mt-3 w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium hidden" aria-label="次の問題">次の問題 →</button>
+  </div>
+
+  <!-- Result -->
+  <div id="result" class="bg-gray-900 rounded-xl p-6 text-center hidden">
+    <div class="text-2xl font-bold text-yellow-300 mb-2">クイズ終了！</div>
+    <div id="finalScore" class="text-4xl font-bold mb-3"></div>
+    <button onclick="restart()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg" aria-label="もう一度">もう一度挑戦</button>
+  </div>
+
+  <!-- Live Tester -->
+  <div class="bg-gray-900 rounded-xl p-5">
+    <h2 class="text-base font-semibold text-blue-300 mb-3">🔬 試してみる（ライブ正規表現テスター）</h2>
+    <div class="space-y-2">
+      <div>
+        <label class="text-xs text-gray-400" for="livePattern">パターン（/ /なし）</label>
+        <input id="livePattern" type="text" placeholder="例: \d+" value="\d+"
+          class="w-full mt-1 px-3 py-2 bg-gray-800 rounded-lg font-mono text-green-300 text-sm border border-gray-700 focus:outline-none focus:border-blue-500"
+          aria-label="正規表現パターン" oninput="liveTest()">
+      </div>
+      <div>
+        <label class="text-xs text-gray-400" for="liveFlags">フラグ</label>
+        <input id="liveFlags" type="text" placeholder="例: gi" value="g"
+          class="w-full mt-1 px-3 py-2 bg-gray-800 rounded-lg font-mono text-blue-300 text-sm border border-gray-700 focus:outline-none focus:border-blue-500"
+          aria-label="フラグ" oninput="liveTest()">
+      </div>
+      <div>
+        <label class="text-xs text-gray-400" for="liveText">テスト文字列</label>
+        <textarea id="liveText" rows="2" placeholder="マッチさせる文字列を入力"
+          class="w-full mt-1 px-3 py-2 bg-gray-800 rounded-lg text-sm border border-gray-700 focus:outline-none focus:border-blue-500"
+          aria-label="テスト文字列" oninput="liveTest()">abc 123 xyz 456</textarea>
+      </div>
+      <div id="liveResult" class="px-3 py-2 bg-gray-800 rounded-lg text-sm min-h-8"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const allQ = [
+  {pat:'.+', q:'.+ が最低1文字の任意の文字列にマッチする理由は？', a:'. は任意の1文字（改行除く）、+ は1回以上の繰り返し', opts:['任意の1文字だけにマッチ','数字のみにマッチ','. は任意の1文字（改行除く）、+ は1回以上の繰り返し','空文字列にもマッチ'], exp:'. は改行を除く任意1文字、+ は1回以上の量指定子です。', test:null},
+  {pat:'^[a-z]+$', q:'^[a-z]+$ にマッチする文字列は？', a:'hello', opts:['Hello','hello','HELLO','hello123'], exp:'^ は行頭、$ は行末、[a-z] は小文字英字、+ は1文字以上です。', test:null},
+  {pat:'\\d{3}-\\d{4}', q:'\\d{3}-\\d{4} にマッチするのは？', a:'012-3456', opts:['12-3456','012-345','012-3456','0123-456'], exp:'\\d は数字1文字、{3} は3回、{4} は4回の繰り返しです。', test:null},
+  {pat:'colou?r', q:'colou?r にマッチする文字列は（両方）？', a:'color と colour の両方', opts:['colorのみ','colourのみ','color と colour の両方','colouur'], exp:'? は直前の文字を0回か1回にします。u? は u があってもなくてもOKです。', test:null},
+  {pat:'\\w+', q:'\\w+ にマッチするものは？', a:'word_123', opts:['hello world（スペース含む）','word_123','hello-world','123.456'], exp:'\\w は [a-zA-Z0-9_] と等価。スペース・ハイフン・ドットは含みません。', test:null},
+  {pat:'\\s', q:'\\s がマッチするものは？', a:'スペース（空白文字）', opts:['数字','英字','スペース（空白文字）','アンダースコア'], exp:'\\s は スペース・タブ・改行などの空白文字クラスです。', test:null},
+  {pat:'a{2,4}', q:'a{2,4} にマッチするのは？', a:'aaa', opts:['a','aaaaaa（6つ）','aaa','（空文字）'], exp:'{2,4} は2回以上4回以下の繰り返しです。aaaは3回なのでマッチします。', test:null},
+  {pat:'(?:foo|bar)', q:'(?:foo|bar) はどちらにマッチ？', a:'foo と bar の両方（キャプチャなし）', opts:['fooのみ','barのみ','foo と bar の両方（キャプチャなし）','foob'], exp:'| は OR、(?:...) は非キャプチャグループです。', test:null},
+  {pat:'(\\w+)\\s(\\w+)', q:'(\\w+)\\s(\\w+) で "hello world" をマッチした時、$1 は？', a:'hello', opts:['hello world','hello','world','\\w+'], exp:'$1 は最初のキャプチャグループ（\\w+）にマッチした文字列です。', test:'hello world'},
+  {pat:'^\\d+$', q:'^\\d+$ にマッチするものは？', a:'12345', opts:['12345','1a2b','12 34','（空文字）'], exp:'^ で行頭、$ で行末を指定し、\\d+ で1文字以上の数字のみを表します。', test:null},
+  {pat:'[^aeiou]', q:'[^aeiou] がマッチするものは？', a:'b（子音）', opts:['a','e','b（子音）','（空文字）'], exp:'[^...] は否定文字クラスで、指定した文字以外にマッチします。', test:null},
+  {pat:'.*', q:'.* が "hello" にマッチする長さは？', a:'0〜5文字（全パターン）', opts:['必ず5文字','1〜5文字','0〜5文字（全パターン）','6文字以上'], exp:'* は0回以上の繰り返しです。空文字にもマッチします。', test:null},
+  {pat:'(?=.*\\d)', q:'(?=.*\\d) の役割は？', a:'数字が含まれることをチェック（先読み）', opts:['数字のみにマッチ','数字を除外','数字が含まれることをチェック（先読み）','数字を1回繰り返す'], exp:'(?=...) は肯定の先読みアサーションで位置をチェックします。', test:null},
+  {pat:'\\b\\w+\\b', q:'\\b の役割は？', a:'単語の境界（wordとnon-wordの境目）', opts:['行頭','バックスペース文字','単語の境界（wordとnon-wordの境目）','空白文字'], exp:'\\b は単語境界（英数字と非英数字の境目）にマッチするゼロ幅アサーションです。', test:null},
+  {pat:'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}', q:'このパターンは何を検証？', a:'メールアドレス（基本形）', opts:['URLのみ','メールアドレス（基本形）','電話番号','郵便番号'], exp:'一般的なメールアドレスのバリデーション正規表現です。', test:'user@example.com'},
+  {pat:'https?://', q:'https?:// にマッチするのは？', a:'http:// と https:// の両方', opts:['https://のみ','http://のみ','http:// と https:// の両方','httpss://'], exp:'s? は s が0回か1回なので、http:// と https:// の両方にマッチします。', test:null},
+  {pat:'(\\d+\\.\\d+)', q:'(\\d+\\.\\d+) にマッチするのは？', a:'3.14', opts:['314','3.14','3','3,14'], exp:'\\. はドット文字（エスケープ）、全体で小数点数にマッチします。', test:'3.14'},
+  {pat:'(?<!\\$)\\d+', q:'(?<!\\$)\\d+ は何をする？', a:'$の直後以外の数字列にマッチ（後読み否定）', opts:['$記号のみにマッチ','$の直後以外の数字列にマッチ（後読み否定）','$を含む数字','全ての数字'], exp:'(?<!...) は否定後読みアサーション。$の直後でない位置の数字にマッチします。', test:'100 $200 300'},
+  {pat:'\\n', q:'\\n がマッチするものは？', a:'改行文字', opts:['nという文字','バックスラッシュn','改行文字','空文字'], exp:'\\n は改行文字（LF、0x0A）を表します。', test:null},
+  {pat:'[0-9]{4}/(0[1-9]|1[0-2])/(0[1-9]|[12]\\d|3[01])', q:'このパターンは何？', a:'日付（YYYY/MM/DD）のバリデーション', opts:['郵便番号','日付（YYYY/MM/DD）のバリデーション','電話番号','ISBN'], exp:'年4桁/月(01-12)/日(01-31)の形式を検証します。', test:'2026/11/03'},
+  {pat:'[\\u3040-\\u309F]', q:'[\\u3040-\\u309F] がマッチするのは？', a:'ひらがな文字', opts:['カタカナ','ひらがな文字','漢字','ASCII文字'], exp:'U+3040〜U+309FはひらがなのUnicode範囲です。', test:null},
+  {pat:'(?:https?|ftp)://', q:'(?:https?|ftp):// にマッチするのは？', a:'http://, https://, ftp:// の3種', opts:['httpsのみ','http://, https://, ftp:// の3種','ftpのみ','sftp://'], exp:'| でhttps?とftpをOR、(?:...)で非キャプチャグループにしています。', test:null},
+  {pat:'\\d+(?=px)', q:'\\d+(?=px) で "16px" をマッチすると？', a:'"16"（pxは含まない）', opts:['"16px"全体','"16"（pxは含まない）','"px"のみ','マッチしない'], exp:'(?=px) は先読みアサーションで、pxの直前の数字にマッチしますが、pxは結果に含まれません。', test:'16px 2em 100px'},
+  {pat:'(cat|dog|bird)', q:'(cat|dog|bird) にマッチしないのは？', a:'cats（複数形）', opts:['cat','dog','bird','cats（複数形）'], exp:'| は完全一致のOR条件です。catsのsはパターンに含まれないため完全マッチしません。', test:null},
+  {pat:'^(?=.*[A-Z])(?=.*\\d).{8,}$', q:'このパターンを満たすパスワードは？', a:'Password1', opts:['password1（大文字なし）','PASSWORD（数字なし）','Pass（8文字未満）','Password1'], exp:'大文字を含み((?=.*[A-Z]))、数字を含み((?=.*\\d))、8文字以上(.{8,})の条件を満たします。', test:null},
+];
+
+let questions = [], idx = 0, score = 0, answered = false;
+let hi = +(localStorage.getItem('regex_hi') || 0);
+document.getElementById('hi').textContent = hi;
+
+function shuffle(a) { return [...a].sort(() => Math.random() - 0.5); }
+
+function start() {
+  questions = shuffle(allQ).slice(0, 25);
+  idx = 0; score = 0; answered = false;
+  document.getElementById('result').classList.add('hidden');
+  document.getElementById('quizCard').classList.remove('hidden');
+  showQ();
+}
+
+function showQ() {
+  const q = questions[idx];
+  document.getElementById('qNum').textContent = `問題 ${idx + 1} / 25`;
+  document.getElementById('question').textContent = q.q;
+  document.getElementById('feedback').classList.add('hidden');
+  document.getElementById('nextBtn').classList.add('hidden');
+  answered = false;
+
+  const patBox = document.getElementById('patternBox');
+  patBox.textContent = '/' + q.pat + '/';
+  patBox.classList.remove('hidden');
+
+  const testBox = document.getElementById('testBox');
+  if (q.test) {
+    testBox.textContent = '文字列: "' + q.test + '"';
+    testBox.classList.remove('hidden');
+  } else {
+    testBox.classList.add('hidden');
+  }
+
+  const opts = shuffle(q.opts);
+  document.getElementById('choices').innerHTML = opts.map(o =>
+    `<button onclick="answer(this,'${o.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','${q.a.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','${q.exp.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"
+     class="w-full text-left px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm border border-gray-700 font-mono"
+     aria-label="${o}">${o}</button>`
+  ).join('');
+  document.getElementById('qcount').textContent = idx;
+  document.getElementById('correct').textContent = score;
+}
+
+function answer(btn, chosen, correct, exp) {
+  if (answered) return;
+  answered = true;
+  const btns = document.getElementById('choices').querySelectorAll('button');
+  btns.forEach(b => {
+    b.disabled = true;
+    if (b.textContent.trim() === correct) b.classList.add('bg-green-800','border-green-500');
+    else if (b.textContent.trim() === chosen && chosen !== correct) b.classList.add('bg-red-800','border-red-500');
+  });
+  const fb = document.getElementById('feedback');
+  if (chosen === correct) { score++; fb.textContent = `✓ 正解！ ${exp}`; fb.className = 'mt-3 p-3 rounded-lg text-sm bg-green-900 text-green-200'; }
+  else { fb.textContent = `✗ 不正解。正解: ${correct}。${exp}`; fb.className = 'mt-3 p-3 rounded-lg text-sm bg-red-900 text-red-200'; }
+  fb.classList.remove('hidden');
+  document.getElementById('nextBtn').classList.remove('hidden');
+  document.getElementById('correct').textContent = score;
+}
+
+function next() {
+  idx++;
+  if (idx >= questions.length) { finish(); return; }
+  showQ();
+}
+
+function finish() {
+  document.getElementById('quizCard').classList.add('hidden');
+  document.getElementById('result').classList.remove('hidden');
+  document.getElementById('qcount').textContent = 25;
+  if (score > hi) { hi = score; localStorage.setItem('regex_hi', hi); document.getElementById('hi').textContent = hi; }
+  document.getElementById('finalScore').textContent = `${score} / 25 (${Math.round(score/25*100)}%)`;
+}
+
+function restart() { start(); }
+
+function escH(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function buildHighlighted(text, pat, gflags) {
+  const re = new RegExp(pat, gflags);
+  const parts = [];
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    parts.push(escH(text.slice(last, m.index)));
+    parts.push(`<mark class="bg-yellow-400 text-black rounded px-0.5">${escH(m[0])}</mark>`);
+    last = m.index + m[0].length;
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  parts.push(escH(text.slice(last)));
+  return parts.join('');
+}
+
+function liveTest() {
+  const pat = document.getElementById('livePattern').value;
+  const flags = document.getElementById('liveFlags').value;
+  const text = document.getElementById('liveText').value;
+  const out = document.getElementById('liveResult');
+  if (!pat) { out.innerHTML = '<span class="text-gray-500">パターンを入力してください</span>'; return; }
+  try {
+    const gflags = flags.includes('g') ? flags : flags + 'g';
+    const re = new RegExp(pat, flags);
+    const matches = [...text.matchAll(new RegExp(pat, gflags))];
+    if (matches.length === 0) {
+      out.innerHTML = '<span class="text-red-400">マッチなし</span>';
+    } else {
+      const highlighted = buildHighlighted(text, pat, gflags);
+      out.innerHTML = `<div class="text-green-400 text-xs mb-1">${matches.length}件マッチ</div><div class="text-sm">${highlighted}</div>`;
+      if (matches[0] && matches[0].length > 1) {
+        const groups = matches[0].slice(1).map((g,i) => `$${i+1}: "${escH(String(g))}"`).join('  ');
+        out.innerHTML += `<div class="text-blue-300 text-xs mt-1">キャプチャ: ${groups}</div>`;
+      }
+    }
+  } catch(e) {
+    out.innerHTML = `<span class="text-red-400">エラー: ${escH(e.message)}</span>`;
+  }
+}
+
+start();
+liveTest();
+</script>
+</body>
+</html>
